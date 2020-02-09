@@ -3,21 +3,23 @@
 namespace LIQRGV\QueryFilter;
 
 use HaydenPierce\ClassFinder\ClassFinder;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 use Laravel\Lumen\Routing\Controller;
 use LIQRGV\QueryFilter\Exception\ModelNotFoundException;
 use LIQRGV\QueryFilter\Exception\NotModelException;
+use LIQRGV\QueryFilter\Struct\BuilderStruct;
 use LIQRGV\QueryFilter\Struct\FilterStruct;
 use LIQRGV\QueryFilter\Struct\ModelBuilderStruct;
+use LIQRGV\QueryFilter\Struct\QueryBuilderStruct;
 use LIQRGV\QueryFilter\Struct\SortStruct;
 
 class RequestParser
 {
 
-    private static $ALLOWED_OPERATOR = [
+    protected static $ALLOWED_OPERATOR = [
         "=",
         "!=",
         ">",
@@ -28,6 +30,10 @@ class RequestParser
         "!in",
         "between",
     ];
+    /**
+     * @var string
+     */
+    protected $tableName;
     /**
      * @var string
      */
@@ -60,12 +66,19 @@ class RequestParser
         return $this;
     }
 
-    public function getBuilder(): Builder
+    public function setTable($tableName): RequestParser
+    {
+        $this->tableName = $tableName;
+
+        return $this;
+    }
+
+    public function getBuilder()
     {
         $modelBuilderStruct = $this->createModelBuilderStruct($this->request);
-        $model = $this->createModel($modelBuilderStruct->baseModelName);
+        $queryBuilder = $this->createModelQuery($modelBuilderStruct->baseModelName);
 
-        $builder = $this->applyFilter($model::query(), $modelBuilderStruct->filters);
+        $builder = $this->applyFilter($queryBuilder, $modelBuilderStruct->filters);
         $builder = $this->applySorter($builder, $modelBuilderStruct->sorter);
         $builder = $this->applyPaginator($builder, $modelBuilderStruct->paginator);
 
@@ -92,6 +105,10 @@ class RequestParser
     {
         if ($this->modelName) {
             return $this->modelName;
+        }
+
+        if ($this->tableName) {
+            return $this->tableName;
         }
 
         $modelCandidates = [];
@@ -197,7 +214,7 @@ class RequestParser
         return null;
     }
 
-    private function applyFilter(Builder $builder, array $filters): Builder
+    private function applyFilter($builder, array $filters)
     {
         foreach ($filters as $filterStruct) {
             $builder = $filterStruct->apply($builder);
@@ -206,7 +223,7 @@ class RequestParser
         return $builder;
     }
 
-    private function applySorter(Builder $builder, array $sorter)
+    private function applySorter($builder, array $sorter)
     {
         if(empty($sorter)) {
             return $builder;
@@ -219,7 +236,7 @@ class RequestParser
         return $builder;
     }
 
-    private function applyPaginator(Builder $builder, array $paginator): Builder
+    private function applyPaginator($builder, array $paginator)
     {
         if ($paginator['limit']){
             return $builder->limit($paginator['limit'])->offset($paginator['offset']);
@@ -227,14 +244,18 @@ class RequestParser
         return $builder;
     }
 
-    private function createModel(string $baseModelName)
+    private function createModelQuery(string $baseModelName)
     {
+        if ($this->tableName == $baseModelName) {
+            return DB::table($baseModelName);
+        }
+
         $model = new $baseModelName;
         if (!($model instanceof Model)) {
             throw new NotModelException($baseModelName);
         }
 
-        return $model;
+        return $model::query();
     }
 
     private function getControllerFromRoute($route)
