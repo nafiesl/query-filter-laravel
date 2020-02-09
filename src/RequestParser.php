@@ -46,6 +46,10 @@ class RequestParser
      * @var Request
      */
     private $request;
+    /**
+     * @var int|null
+     */
+    protected $pageLimit;
 
     public function __construct(Request $request)
     {
@@ -73,6 +77,13 @@ class RequestParser
         return $this;
     }
 
+    public function setPageLimit(int $pageLimit): RequestParser
+    {
+        $this->pageLimit = $pageLimit;
+
+        return $this;
+    }
+
     public function getBuilder()
     {
         $modelBuilderStruct = $this->createModelBuilderStruct($this->request);
@@ -87,10 +98,11 @@ class RequestParser
 
     private function createModelBuilderStruct(Request $request): ModelBuilderStruct
     {
+        $defaultPageLimit = $this->pageLimit ?: Config::get('query_filter.default_page_limit');
         $queryParam = $request->query;
         $filterQuery = $queryParam->get('filter') ?? [];
         $sortQuery = $queryParam->get('sort') ?? null;
-        $limitQuery = $queryParam->get('limit') ?? null;
+        $limitQuery = $queryParam->get('limit', $defaultPageLimit);
         $offsetQuery = $queryParam->get('offset') ?? 0;
 
         $baseModelName = $this->getBaseModelName($request);
