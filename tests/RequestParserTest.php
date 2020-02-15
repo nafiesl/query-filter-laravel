@@ -471,7 +471,7 @@ class RequestParserTest extends TestCase
         $request = $this->createControllerRequest($uri, $controllerClass, $query, $requestParserOptions);
 
         $requestParser = new RequestParser($request);
-        $requestParser->setPageLimit(130);
+        $requestParser->setDefaultLimit(130);
         $builder = $requestParser->getBuilder();
 
         $query = $builder->getQuery();
